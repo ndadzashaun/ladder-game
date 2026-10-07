@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Healthy Ladders - Beat the NCD Challenge</title>
+<style>
+  :root {
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --panel: #f8fafc;
+    --card: #ffffff;
+    --text: #172033;
+    --muted: #64748b;
+    --border: #cbd5e1;
+    --good: #dcfce7;
+    --bad: #fee2e2;
+    --special: #fef3c7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    color: var(--text);
+    background: radial-gradient(circle at top, #dbeafe 0%, #eef2f7 42%, #e2e8f0 100%);
+    padding: 20px;
+  }
+  .game {
+    max-width: 900px;
+    margin: auto;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 16px;
+  }
+  h1 { margin: 0 0 4px; font-size: 30px; }
+  .subtitle, .small { color: var(--muted); }
+  .score-box {
+    text-align: right;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 16px;
+  }
+  .score { font-size: 26px; font-weight: bold; }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 18px;
+    margin-bottom: 15px;
+  }
+  .stats {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 14px;
+  }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    max-width: 600px;
+    margin: 18px auto 0;
+  }
+  .cell {
+    aspect-ratio: 1;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 7px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 12px;
+    background: white;
+  }
+  .cell strong { font-size: 13px; }
+  .cell.good { background: var(--good); }
+  .cell.bad { background: var(--bad); }
+  .cell.special { background: var(--special); }
+  .cell.player {
+    outline: 3px solid var(--accent);
+    box-shadow: inset 0 0 0 2px white;
+  }
+  .status {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 15px;
+    line-height: 1.45;
+    background: var(--panel);
+    margin-bottom: 14px;
+  }
+  button {
+    min-height: 48px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 10px 18px;
+    font-size: 16px;
+    cursor: pointer;
+    background: white;
+    color: var(--text);
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    font-weight: bold;
+  }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+  .question-options {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .question-options button { text-align: left; }
+  .hidden { display: none; }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 14px;
+  }
+  @media (max-width: 520px) {
+    body { padding: 10px; }
+    h1 { font-size: 25px; }
+    .cell { font-size: 10px; padding: 4px; }
+    .cell strong { font-size: 11px; }
+    .header { align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<main class="game" id="healthy-ladders">
+  <div class="header">
+    <div>
+      <div class="small">Educational serious game</div>
+      <h1>🏃 Healthy Ladders</h1>
+      <div class="subtitle">Beat the NCD Challenge</div>
+    </div>
+    <div class="score-box">
+      <div class="small">Score</div>
+      <div class="score" id="score">0</div>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="stats">
+      <span id="position">Position: 1 / 25</span>
+      <span id="streak">🔥 Streak: 0</span><span id="best">🏆 Best: 0</span>
+    </div>
+    <div class="board" id="board"></div>
+    <div class="progress-wrap"><div class="progress"><div id="progress"></div></div></div>
+
+    <div class="legend">
+      <span>🟢 Healthy choice</span>
+      <span>🔴 Unhealthy choice</span>
+      <span>⭐ Special space</span>
+      <span>🔵 Your position</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="status" id="status" aria-live="polite">
+      <strong>Start the challenge!</strong>
+      <p class="small">Roll the dice and make healthy choices to climb toward space 25.</p>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="roll">🎲 Roll dice</button>
+      <button id="reset">Restart</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  const board = document.getElementById("board");
+  const scoreEl = document.getElementById("score");
+  const positionEl = document.getElementById("position");
+  const streakEl = document.getElementById("streak");
+  const bestEl = document.getElementById("best");
+  const progressEl = document.getElementById("progress");
+  const statusEl = document.getElementById("status");
+  const rollButton = document.getElementById("roll");
+  const resetButton = document.getElementById("reset");
+
+  const cells = {
+    4:  { icon: "🥗", type: "good", msg: "You chose a healthy meal! +10 points." },
+    7:  { icon: "🚶", type: "good", msg: "Physical activity boost! Climb to 12. +15 points.", to: 12 },
+    9:  { icon: "🚬", type: "bad", msg: "Tobacco exposure! Move back 2 spaces. -10 points.", to: 7 },
+    11: { icon: "💧", type: "good", msg: "Great hydration choice! +10 points." },
+    14: { icon: "🍬", type: "bad", msg: "Too much added sugar. Move back 2 spaces. -10 points.", to: 12 },
+    16: { icon: "🩺", type: "special", msg: "Health check! Answer the question to continue." },
+    18: { icon: "🏃", type: "good", msg: "Excellent activity streak! Climb to 22. +20 points.", to: 22 },
+    20: { icon: "🍟", type: "bad", msg: "Frequent unhealthy food choices can increase NCD risk. Move back 3. -10 points.", to: 17 },
+    22: { icon: "😴", type: "good", msg: "Good sleep habits support overall health. +10 points." },
+    24: { icon: "⭐", type: "special", msg: "FINAL BONUS! Healthy streak +20 points." }
+  };
+
+  let position = 1;
+  let score = 0;
+  let streak = 0;
+  let locked = false;
+  let best = Number(localStorage.getItem("healthyLaddersBest") || 0);
+  bestEl.textContent = "🏆 Best: " + best;
+
+  function drawBoard() {
+    board.innerHTML = "";
+
+    for (let n = 1; n <= 25; n++) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+
+      if (cells[n]) {
+        cell.classList.add(cells[n].type);
+        if (cells[n].to && cells[n].to > n) cell.classList.add("ladder");
+        if (cells[n].to && cells[n].to < n) cell.classList.add("risk");
+      }
+
+      if (n === position) {
+        cell.classList.add("player");
+      }
+
+      const strong = document.createElement("strong");
+      strong.textContent = n;
+
+      const icon = document.createElement("span");
+      icon.textContent = cells[n] ? cells[n].icon : "";
+
+      cell.appendChild(strong);
+      cell.appendChild(icon);
+      board.appendChild(cell);
+    }
+
+    positionEl.textContent = "Position: " + position + " / 25";
+    scoreEl.textContent = score;
+    streakEl.textContent = "🔥 Streak: " + streak;
+    bestEl.textContent = "🏆 Best: " + best;
+    progressEl.style.width = ((position / 25) * 100) + "%";
+  }
+
+  function setStatus(title, message) {
+    statusEl.innerHTML =
+      "<strong>" + title + "</strong>" +
+      "<p class='small'>" + message + "</p>";
+  }
+
+  function finishGame() {
+    locked = true;
+    if (score > best) { best = score; localStorage.setItem("healthyLaddersBest", best); }
+    rollButton.disabled = true;
+
+    let rating;
+
+    if (score >= 100) {
+      rating = "🏆 NCD Champion!";
+    } else if (score >= 60) {
+      rating = "🌟 Healthy Hero!";
+    } else {
+      rating = "💪 Good effort!";
+    }
+
+    setStatus(
+      rating,
+      "You reached the finish with " + score +
+      " points. Restart the game and try to beat your score!"
+    );
+  }
+
+  function showHealthQuestion() {
+    locked = true;
+
+    statusEl.innerHTML = `
+      <strong>🩺 Health Check</strong>
+      <p>Which choice is better for reducing NCD risk?</p>
+      <div class="question-options">
+        <button type="button" data-answer="good">
+          Choose regular physical activity and avoid tobacco.
+        </button>
+        <button type="button" data-answer="bad">
+          Stay inactive and smoke occasionally.
+        </button>
+      </div>
+    `;
+
+    statusEl.querySelectorAll("button").forEach(function (button) {
+      button.addEventListener("click", function () {
+        if (button.dataset.answer === "good") {
+          score += 20;
+          streak += 1;
+          setStatus(
+            "Correct! +20 points.",
+            "Regular physical activity and avoiding tobacco are healthier choices that can help reduce NCD risk."
+          );
+        } else {
+          score = Math.max(0, score - 10);
+          streak = 0;
+          setStatus(
+            "Not quite.",
+            "Regular physical activity and avoiding tobacco are healthier choices."
+          );
+        }
+
+        locked = false;
+        drawBoard();
+      });
+    });
+  }
+
+  rollButton.addEventListener("click", function () {
+    if (locked) return;
+
+    locked = true;
+
+    const dice = Math.floor(Math.random() * 6) + 1;
+    rollButton.textContent = "🎲 Rolled " + dice + "!";
+    rollButton.classList.add("dice-roll");
+    setTimeout(function(){ rollButton.classList.remove("dice-roll"); }, 550);
+    position = Math.min(25, position + dice);
+
+    const cell = cells[position];
+
+    if (cell && cell.type === "good") {
+      score += 10;
+      streak += 1;
+
+      if (streak >= 3) {
+        score += 15;
+        setStatus(
+          "🔥 3-choice streak! +25 bonus.",
+          "You are building a strong healthy-choice streak."
+        );
+      } else {
+        setStatus("Good choice! +10 points.", cell.msg);
+      }
+
+    } else if (cell && cell.type === "bad") {
+      score = Math.max(0, score - 10);
+      streak = 0;
+      setStatus("⚠️ Unhealthy choice!", cell.msg);
+
+    } else if (cell && cell.type === "special" && position === 16) {
+      drawBoard();
+      showHealthQuestion();
+      return;
+
+    } else if (cell && cell.type === "special" && position === 24) {
+      score += 20;
+      setStatus(
+        "⭐ Final bonus! +20 points.",
+        "One more step to reach the finish."
+      );
+
+    } else {
+      score += 5;
+      setStatus(
+        "Nice move!",
+        "You earned 5 points for progressing."
+      );
+    }
+
+    if (cell && cell.to) {
+      position = cell.to;
+    }
+
+    if (position >= 25) {
+      position = 25;
+      drawBoard();
+      finishGame();
+      return;
+    }
+
+    drawBoard();
+    locked = false;
+  });
+
+  resetButton.addEventListener("click", function () {
+    position = 1;
+    score = 0;
+    streak = 0;
+    locked = false;
+    rollButton.disabled = false;
+
+    setStatus(
+      "Start the challenge!",
+      "Roll the dice and make healthy choices to climb toward space 25."
+    );
+
+    drawBoard();
+  });
+
+  document.addEventListener("keydown", function(e) {
+    if ((e.key === " " || e.key === "Enter") && document.activeElement.tagName !== "BUTTON") {
+      e.preventDefault();
+      if (!locked) rollButton.click();
+    }
+  });
+
+  drawBoard();
+})();
+</script>
+</body>
+</html>
